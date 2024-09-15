@@ -62,9 +62,13 @@ public class App extends JFrame {
 
         JPanel buttonPanel = createButtonPanel();
 
+        // Use JScrollPane to enable scrolling for the canvas
+        JScrollPane scrollPane = new JScrollPane(canvas);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+
         setLayout(new BorderLayout());
         add(buttonPanel, BorderLayout.NORTH);
-        add(new JScrollPane(canvas), BorderLayout.CENTER);
+        add(scrollPane, BorderLayout.CENTER);
 
         pack();
         setLocationRelativeTo(null);
@@ -291,8 +295,11 @@ public class App extends JFrame {
     }
 
     class CanvasPanel extends JPanel {
+        private Point lastErasePoint = null;
+
         public CanvasPanel() {
-            setPreferredSize(new Dimension(800, 600));
+            // Set a large preferred size to allow scrolling
+            setPreferredSize(new Dimension(800, 6000)); // Adjust as needed
         }
 
         @Override
@@ -331,6 +338,12 @@ public class App extends JFrame {
                 g2.fillRect(x, y, width, height);
             }
 
+            if (erasing && lastErasePoint != null) {
+                g2.setColor(Color.WHITE);
+                g2.setStroke(new BasicStroke(penThickness * 2, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawLine(lastErasePoint.x, lastErasePoint.y, lastErasePoint.x, lastErasePoint.y);
+            }
+
             if (gridVisible) {
                 drawGrid(g2);
             }
@@ -345,15 +358,23 @@ public class App extends JFrame {
             path.moveTo(points.get(0).getX(), points.get(0).getY());
 
             for (int i = 1; i < points.size() - 1; i++) {
-                Point2D p1 = points.get(i);
-                Point2D p2 = points.get(i + 1);
+                Point2D p1 = points.get(i - 1);
+                Point2D p2 = points.get(i);
+                Point2D p3 = points.get(i + 1);
+
                 double x1 = p1.getX();
                 double y1 = p1.getY();
                 double x2 = p2.getX();
                 double y2 = p2.getY();
-                double midX = (x1 + x2) / 2;
-                double midY = (y1 + y2) / 2;
-                path.quadTo(x1, y1, midX, midY);
+                double x3 = p3.getX();
+                double y3 = p3.getY();
+
+                double ctrl1X = (x1 + x2) / 2;
+                double ctrl1Y = (y1 + y2) / 2;
+                double ctrl2X = (x2 + x3) / 2;
+                double ctrl2Y = (y2 + y3) / 2;
+
+                path.curveTo(ctrl1X, ctrl1Y, ctrl2X, ctrl2Y, x3, y3);
             }
 
             if (points.size() > 1) {
@@ -367,9 +388,36 @@ public class App extends JFrame {
         private void erase(int x, int y) {
             int eraseSize = penThickness * 10;
             Rectangle2D eraser = new Rectangle2D.Double(x - eraseSize / 2.0, y - eraseSize / 2.0, eraseSize, eraseSize);
-            allLines.removeIf(line -> line.points.stream().anyMatch(p -> eraser.contains(p)));
+
+            // Itera sobre todas as linhas
+            for (int i = 0; i < allLines.size(); i++) {
+                ColoredLine line = allLines.get(i);
+
+                // Cria uma nova lista para armazenar os pontos da linha que não foram apagados
+                List<Point2D> newLinePoints = new ArrayList<>();
+
+                // Itera sobre os pontos da linha
+                for (Point2D point : line.points) {
+                    // Se o ponto estiver fora do retângulo da borracha, adiciona-o à nova lista
+                    if (!eraser.contains(point)) {
+                        newLinePoints.add(point);
+                    }
+                }
+
+                // Se a nova lista tiver pontos, atualiza a linha com os novos pontos
+                if (!newLinePoints.isEmpty()) {
+                    allLines.set(i, new ColoredLine(newLinePoints, line.color, line.thickness));
+                } else {
+                    // Caso contrário, remove a linha completamente
+                    allLines.remove(i);
+                    i--; // Decrementa o índice para evitar pular uma linha após remover
+                }
+            }
+
+            lastErasePoint = new Point(x, y);
             repaint();
         }
+
 
         private void drawGrid(Graphics2D g2) {
             int gridSize = 40; // Define o tamanho do grid (espaçamento entre as linhas)
@@ -387,5 +435,5 @@ public class App extends JFrame {
             }
         }
     }
- 
+
 }

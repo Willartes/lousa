@@ -11,7 +11,7 @@ import javax.swing.SwingUtilities;
 public class Whiteboard {
 
     public static void main(String[] args) {
-        //SwingUtilities.invokeLater(() -> new App());
-        SwingUtilities.invokeLater(() -> new App2());
+        SwingUtilities.invokeLater(() -> new App());
+        //SwingUtilities.invokeLater(() -> new App2());
     }
 }
