@@ -95,7 +95,7 @@ public class App2 extends JFrame {
 
         JPanel buttonPanel = createButtonPanel();
 
-        // Use JScrollPane to enable scrolling for the canvas
+        // Use JScrollPane para habilitar rolagem para o canvas
         JScrollPane scrollPane = new JScrollPane(canvas);
         scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
 
@@ -151,6 +151,14 @@ public class App2 extends JFrame {
                         Image image = (Image) transferable.getTransferData(DataFlavor.imageFlavor);
                         Point point = dtde.getLocation();
                         imageItems.add(new ImageItem((BufferedImage) image, point.x, point.y));
+                        canvas.repaint();
+                        dtde.dropComplete(true);
+                    } else if (dtde.isDataFlavorSupported(DataFlavor.stringFlavor)) {
+                        dtde.acceptDrop(DnDConstants.ACTION_COPY_OR_MOVE);
+                        Transferable transferable = dtde.getTransferable();
+                        String text = (String) transferable.getTransferData(DataFlavor.stringFlavor);
+                        Point point = dtde.getLocation();
+                        textItems.add(new TextItem(text, point.x, point.y));
                         canvas.repaint();
                         dtde.dropComplete(true);
                     } else {
@@ -392,8 +400,8 @@ public class App2 extends JFrame {
         private Point lastErasePoint = null;
 
         public CanvasPanel() {
-            // Set a large preferred size to allow scrolling
-            setPreferredSize(new Dimension(800, 6000)); // Adjust as needed
+            // Define um tamanho preferido grande para permitir rolagem
+            setPreferredSize(new Dimension(800, 6000)); // Ajuste conforme necessário
         }
 
         @Override
@@ -403,21 +411,21 @@ public class App2 extends JFrame {
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
 
-            // Draw all saved lines
+            // Desenha todas as linhas salvas
             for (ColoredLine line : allLines) {
                 g2.setColor(line.color);
                 g2.setStroke(new BasicStroke(line.thickness, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                 drawSmoothLine(g2, line.points);
             }
 
-            // Draw current line
+            // Desenha a linha atual
             if (drawingLine && !currentLine.isEmpty()) {
                 g2.setColor(currentColor);
                 g2.setStroke(new BasicStroke(penThickness, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                 drawSmoothLine(g2, currentLine);
             }
 
-            // Draw highlight areas
+            // Desenha as áreas de destaque
             for (HighlightArea area : highlightAreas) {
                 g2.setColor(new Color(255, 255, 0, 128));
                 g2.fillRect(area.x, area.y, area.width, area.height);
@@ -442,12 +450,12 @@ public class App2 extends JFrame {
                 drawGrid(g2);
             }
 
-            // Desenhar as imagens
+            // Desenha as imagens
             for (ImageItem item : imageItems) {
                 g2.drawImage(item.image, item.x, item.y, null);
             }
 
-            // Desenhar o texto
+            // Desenha o texto
             g2.setColor(Color.BLACK); // Define a cor do texto
             g2.setFont(new Font("Arial", Font.PLAIN, 12)); // Define a fonte do texto
             for (TextItem item : textItems) {
@@ -524,7 +532,6 @@ public class App2 extends JFrame {
             repaint();
         }
 
-
         private void drawGrid(Graphics2D g2) {
             int gridSize = 40; // Define o tamanho do grid (espaçamento entre as linhas)
             g2.setColor(new Color(205, 205, 205, 70));
@@ -542,4 +549,5 @@ public class App2 extends JFrame {
         }
     }
 
+    
 }
