@@ -2,8 +2,15 @@ package whiteboard;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.datatransfer.*;
+import java.awt.dnd.DnDConstants;
+import java.awt.dnd.DropTarget;
+import java.awt.dnd.DropTargetAdapter;
+import java.awt.dnd.DropTargetDropEvent;
 import java.awt.event.*;
 import java.awt.geom.*;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,6 +30,32 @@ public class App2 extends JFrame {
     private List<HighlightArea> highlightAreas = new ArrayList<>();
     private Point highlightStart;
     private Point highlightEnd;
+    private List<ImageItem> imageItems = new ArrayList<>();
+    private List<TextItem> textItems = new ArrayList<>();
+
+    // Classe para armazenar dados da imagem
+    private static class ImageItem {
+        BufferedImage image;
+        int x, y;
+
+        ImageItem(BufferedImage image, int x, int y) {
+            this.image = image;
+            this.x = x;
+            this.y = y;
+        }
+    }
+
+    // Classe para armazenar dados do texto
+    private static class TextItem {
+        String text;
+        int x, y;
+
+        TextItem(String text, int x, int y) {
+            this.text = text;
+            this.x = x;
+            this.y = y;
+        }
+    }
 
     private static class ColoredLine {
         List<Point2D> points;
@@ -62,9 +95,72 @@ public class App2 extends JFrame {
 
         JPanel buttonPanel = createButtonPanel();
 
+        // Use JScrollPane to enable scrolling for the canvas
+        JScrollPane scrollPane = new JScrollPane(canvas);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+
         setLayout(new BorderLayout());
         add(buttonPanel, BorderLayout.NORTH);
-        add(new JScrollPane(canvas), BorderLayout.CENTER);
+        add(scrollPane, BorderLayout.CENTER);
+
+        // Adiciona listener de colagem
+        canvas.setTransferHandler(new TransferHandler("image;text") { // Suporta imagem e texto
+            @Override
+            public boolean canImport(TransferHandler.TransferSupport support) {
+                return support.isDataFlavorSupported(DataFlavor.imageFlavor) ||
+                       support.isDataFlavorSupported(DataFlavor.stringFlavor);
+            }
+
+            @Override
+            public boolean importData(TransferHandler.TransferSupport support) {
+                if (canImport(support)) {
+                    try {
+                        if (support.isDataFlavorSupported(DataFlavor.imageFlavor)) {
+                            Image image = (Image) support.getTransferable().getTransferData(DataFlavor.imageFlavor);
+                            Point point = canvas.getMousePosition();
+                            if (point != null) {
+                                imageItems.add(new ImageItem((BufferedImage) image, point.x, point.y));
+                                canvas.repaint();
+                                return true;
+                            }
+                        } else if (support.isDataFlavorSupported(DataFlavor.stringFlavor)) {
+                            String text = (String) support.getTransferable().getTransferData(DataFlavor.stringFlavor);
+                            Point point = canvas.getMousePosition();
+                            if (point != null) {
+                                textItems.add(new TextItem(text, point.x, point.y));
+                                canvas.repaint();
+                                return true;
+                            }
+                        }
+                    } catch (UnsupportedFlavorException | IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+                return false;
+            }
+        });
+
+        // Adiciona listener para arrastar e soltar (no canvas)
+        canvas.setDropTarget(new DropTarget(canvas, new DropTargetAdapter() {
+            @Override
+            public void drop(DropTargetDropEvent dtde) {
+                try {
+                    if (dtde.isDataFlavorSupported(DataFlavor.imageFlavor)) {
+                        dtde.acceptDrop(DnDConstants.ACTION_COPY_OR_MOVE);
+                        Transferable transferable = dtde.getTransferable();
+                        Image image = (Image) transferable.getTransferData(DataFlavor.imageFlavor);
+                        Point point = dtde.getLocation();
+                        imageItems.add(new ImageItem((BufferedImage) image, point.x, point.y));
+                        canvas.repaint();
+                        dtde.dropComplete(true);
+                    } else {
+                        dtde.rejectDrop();
+                    }
+                } catch (UnsupportedFlavorException | IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }));
 
         pack();
         setLocationRelativeTo(null);
@@ -230,6 +326,8 @@ public class App2 extends JFrame {
         currentLine.clear();
         allLines.clear();
         highlightAreas.clear();
+        imageItems.clear(); // Limpa as imagens
+        textItems.clear(); // Limpa o texto
         canvas.repaint();
     }
 
@@ -291,8 +389,11 @@ public class App2 extends JFrame {
     }
 
     class CanvasPanel extends JPanel {
+        private Point lastErasePoint = null;
+
         public CanvasPanel() {
-            setPreferredSize(new Dimension(800, 600));
+            // Set a large preferred size to allow scrolling
+            setPreferredSize(new Dimension(800, 6000)); // Adjust as needed
         }
 
         @Override
@@ -331,8 +432,26 @@ public class App2 extends JFrame {
                 g2.fillRect(x, y, width, height);
             }
 
+            if (erasing && lastErasePoint != null) {
+                g2.setColor(Color.WHITE);
+                g2.setStroke(new BasicStroke(penThickness * 2, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawLine(lastErasePoint.x, lastErasePoint.y, lastErasePoint.x, lastErasePoint.y);
+            }
+
             if (gridVisible) {
                 drawGrid(g2);
+            }
+
+            // Desenhar as imagens
+            for (ImageItem item : imageItems) {
+                g2.drawImage(item.image, item.x, item.y, null);
+            }
+
+            // Desenhar o texto
+            g2.setColor(Color.BLACK); // Define a cor do texto
+            g2.setFont(new Font("Arial", Font.PLAIN, 12)); // Define a fonte do texto
+            for (TextItem item : textItems) {
+                g2.drawString(item.text, item.x, item.y); // Desenha o texto
             }
 
             g2.dispose();
@@ -373,11 +492,38 @@ public class App2 extends JFrame {
         }
 
         private void erase(int x, int y) {
-            int eraseSize = penThickness * 10;
+            int eraseSize = penThickness * 5;
             Rectangle2D eraser = new Rectangle2D.Double(x - eraseSize / 2.0, y - eraseSize / 2.0, eraseSize, eraseSize);
-            allLines.removeIf(line -> line.points.stream().anyMatch(p -> eraser.contains(p)));
+
+            // Itera sobre todas as linhas
+            for (int i = 0; i < allLines.size(); i++) {
+                ColoredLine line = allLines.get(i);
+
+                // Cria uma nova lista para armazenar os pontos da linha que não foram apagados
+                List<Point2D> newLinePoints = new ArrayList<>();
+
+                // Itera sobre os pontos da linha
+                for (Point2D point : line.points) {
+                    // Se o ponto estiver fora do retângulo da borracha, adiciona-o à nova lista
+                    if (!eraser.contains(point)) {
+                        newLinePoints.add(point);
+                    }
+                }
+
+                // Se a nova lista tiver pontos, atualiza a linha com os novos pontos
+                if (!newLinePoints.isEmpty()) {
+                    allLines.set(i, new ColoredLine(newLinePoints, line.color, line.thickness));
+                } else {
+                    // Caso contrário, remove a linha completamente
+                    allLines.remove(i);
+                    i--; // Decrementa o índice para evitar pular uma linha após remover
+                }
+            }
+
+            lastErasePoint = new Point(x, y);
             repaint();
         }
+
 
         private void drawGrid(Graphics2D g2) {
             int gridSize = 40; // Define o tamanho do grid (espaçamento entre as linhas)
