@@ -1,3 +1,4 @@
+
 package whiteboard;
 
 import javax.swing.*;
@@ -16,7 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.imageio.ImageIO;
 
-public class App2 extends JFrame {
+public class App3 extends JFrame {
 
     private CanvasPanel canvas;
     private boolean erasing = false;
@@ -34,7 +35,9 @@ public class App2 extends JFrame {
     private Point highlightEnd;
     private List<ImageItem> imageItems = new ArrayList<>();
     private List<TextItem> textItems = new ArrayList<>();
+    private BufferedImage penImage;
 
+    // Classe para armazenar dados da imagem
     private static class ImageItem {
         BufferedImage image;
         int x, y;
@@ -84,9 +87,10 @@ public class App2 extends JFrame {
         }
     }
 
-    public App2() {
+    public App3() {
         initializeUI();
         setupMouseListeners();
+        loadPenImage(); // Carrega a imagem da caneta
     }
 
     private void initializeUI() {
@@ -466,6 +470,14 @@ public class App2 extends JFrame {
         }
     }
 
+    private void loadPenImage() {
+        try {
+            penImage = ImageIO.read(new File("pen.png")); // Substitua "pen.png" pelo nome do seu arquivo de imagem
+        } catch (IOException e) {
+            System.err.println("Erro ao carregar imagem da caneta: " + e.getMessage());
+        }
+    }
+
     class CanvasPanel extends JPanel {
         private Point lastErasePoint = null;
 
@@ -524,6 +536,13 @@ public class App2 extends JFrame {
                 g2.setColor(item.color);
                 g2.setFont(item.font);
                 g2.drawString(item.text, item.x, item.y);
+            }
+
+            // Desenhar a imagem da caneta
+            if (drawingLine && !erasing) {
+                Point mousePosition = MouseInfo.getPointerInfo().getLocation();
+                SwingUtilities.convertPointFromScreen(mousePosition, canvas);
+                g2.drawImage(penImage, mousePosition.x - penImage.getWidth() / 2, mousePosition.y - penImage.getHeight() / 2, null);
             }
 
             g2.dispose();
