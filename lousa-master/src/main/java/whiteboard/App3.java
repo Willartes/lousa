@@ -1,13 +1,9 @@
-
 package whiteboard;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.datatransfer.*;
-import java.awt.dnd.DnDConstants;
-import java.awt.dnd.DropTarget;
-import java.awt.dnd.DropTargetAdapter;
-import java.awt.dnd.DropTargetDropEvent;
+import java.awt.dnd.*;
 import java.awt.event.*;
 import java.awt.geom.*;
 import java.awt.image.BufferedImage;
@@ -35,9 +31,7 @@ public class App3 extends JFrame {
     private Point highlightEnd;
     private List<ImageItem> imageItems = new ArrayList<>();
     private List<TextItem> textItems = new ArrayList<>();
-    private BufferedImage penImage;
 
-    // Classe para armazenar dados da imagem
     private static class ImageItem {
         BufferedImage image;
         int x, y;
@@ -90,7 +84,7 @@ public class App3 extends JFrame {
     public App3() {
         initializeUI();
         setupMouseListeners();
-        loadPenImage(); // Carrega a imagem da caneta
+        createPenCursor(); // Adiciona o cursor de caneta
     }
 
     private void initializeUI() {
@@ -303,6 +297,26 @@ public class App3 extends JFrame {
         }));
     }
 
+    private void createPenCursor() {
+        try {
+            // Carrega a imagem da caneta
+            BufferedImage cursorImg = ImageIO.read(new File("pen_cursor.png"));
+            if (cursorImg == null) {
+                System.err.println("Error: The image 'pen_cursor.png' is null.");
+                return;
+            }
+            // Cria um cursor personalizado com a imagem da caneta
+            Cursor penCursor = Toolkit.getDefaultToolkit().createCustomCursor(
+                cursorImg, new Point(0, cursorImg.getHeight() - 1), "Pen Cursor");
+            // Define o cursor personalizado para o canvas
+            canvas.setCursor(penCursor);
+        } catch (IOException e) {
+            System.err.println("Error loading pen cursor image: " + e.getMessage());
+            // Fallback to default cursor if image can't be loaded
+            canvas.setCursor(Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR));
+        }
+    }
+
     private void startDrawing(Point p) {
         if (!erasing) {
             drawingLine = true;
@@ -470,14 +484,6 @@ public class App3 extends JFrame {
         }
     }
 
-    private void loadPenImage() {
-        try {
-            penImage = ImageIO.read(new File("pen.png")); // Substitua "pen.png" pelo nome do seu arquivo de imagem
-        } catch (IOException e) {
-            System.err.println("Erro ao carregar imagem da caneta: " + e.getMessage());
-        }
-    }
-
     class CanvasPanel extends JPanel {
         private Point lastErasePoint = null;
 
@@ -536,13 +542,6 @@ public class App3 extends JFrame {
                 g2.setColor(item.color);
                 g2.setFont(item.font);
                 g2.drawString(item.text, item.x, item.y);
-            }
-
-            // Desenhar a imagem da caneta
-            if (drawingLine && !erasing) {
-                Point mousePosition = MouseInfo.getPointerInfo().getLocation();
-                SwingUtilities.convertPointFromScreen(mousePosition, canvas);
-                g2.drawImage(penImage, mousePosition.x - penImage.getWidth() / 2, mousePosition.y - penImage.getHeight() / 2, null);
             }
 
             g2.dispose();
